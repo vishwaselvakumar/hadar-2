@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
+require("dotenv").config(); // Optional if you use .env for secrets
 
 // Internal Routes
 const authRouter = require("./routes/auth/auth-routes");
@@ -30,13 +31,26 @@ mongoose
   .then(() => console.log("✅ MongoDB connected"))
   .catch((error) => console.error("❌ MongoDB connection error:", error));
 
-// Middleware
+// CORS Setup
+const allowedOrigins = [
+  "https://hadar-clothings.netlify.app",
+  "http://localhost:5173",
+];
+
 app.use(cors({
-  origin: "https://hadar-clothings.netlify.app",
-  methods: ["GET", "POST", "DELETE", "PUT"],
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+// Middleware
 app.use(cookieParser());
 app.use(express.json());
 
@@ -61,53 +75,53 @@ app.use("/api/common/feature", commonFeatureRouter);
 // Razorpay Configuration
 const razorpay = new Razorpay({
   key_id: "rzp_test_nhhCl0y64g4Yt5",
-  key_secret: "3QiGoDxzkR92q0BhHUz33zvp",
+  key_secret: "3QiGoDxzkR92q0BhHUz33zvp", // move this to .env in production
 });
 
-// Create Razorpay Order
-// app.post("/api/payment/razorpay-order", async (req, res) => {
-//   try {
-//     const { amount } = req.body;
+// Razorpay Order Route
+app.post("/api/payment/razorpay-order", async (req, res) => {
+  try {
+    const { amount } = req.body;
 
-//     if (!amount) {
-//       return res.status(400).json({ error: "Amount is required" });
-//     }
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
 
-//     const options = {
-//       amount: amount, // Convert to paise
-//       currency: "INR",
-//       receipt: `receipt_${Date.now()}`,
-//     };
+    const options = {
+      amount: amount * 100, // Convert to paise
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+    };
 
-//     const order = await razorpay.orders.create(options);
-//     res.status(200).json(order);
-//   } catch (error) {
-//     console.error("❌ Razorpay Order creation error:", error);
-//     res.status(500).json({ error: "Failed to create Razorpay order" });
-//   }
-// });
+    const order = await razorpay.orders.create(options);
+    res.status(200).json(order);
+  } catch (error) {
+    console.error("❌ Razorpay Order creation error:", error);
+    res.status(500).json({ error: "Failed to create Razorpay order" });
+  }
+});
 
-// Verify Razorpay Payment Signature
-// app.post("/api/payment/verify", (req, res) => {
-//   try {
-//     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+// Razorpay Payment Verification Route
+app.post("/api/payment/verify", (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-//     const sign = `${razorpay_order_id}|${razorpay_payment_id}`;
-//     const expectedSignature = crypto
-//       .createHmac("sha256", razorpay.key_secret)
-//       .update(sign)
-//       .digest("hex");
+    const sign = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", razorpay.key_secret)
+      .update(sign)
+      .digest("hex");
 
-//     if (expectedSignature === razorpay_signature) {
-//       res.status(200).json({ success: true, message: "Payment verified successfully" });
-//     } else {
-//       res.status(400).json({ success: false, message: "Invalid payment signature" });
-//     }
-//   } catch (error) {
-//     console.error("❌ Razorpay verification error:", error);
-//     res.status(500).json({ error: "Payment verification failed" });
-//   }
-// });
+    if (expectedSignature === razorpay_signature) {
+      res.status(200).json({ success: true, message: "Payment verified successfully" });
+    } else {
+      res.status(400).json({ success: false, message: "Invalid payment signature" });
+    }
+  } catch (error) {
+    console.error("❌ Razorpay verification error:", error);
+    res.status(500).json({ error: "Payment verification failed" });
+  }
+});
 
 // Start Server
 app.listen(PORT, () => {
