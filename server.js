@@ -32,7 +32,7 @@ mongoose
 
 // Middleware
 app.use(cors({
-  origin: "https://lucky-donut-dfa4e6.netlify.app",
+  origin: "https://hadar-clothings.netlify.app",
   methods: ["GET", "POST", "DELETE", "PUT"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
